@@ -1,7 +1,7 @@
 package sh.sit.plp.mixin;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.components.spectator.SpectatorGui;
 import net.minecraft.client.DeltaTracker;
@@ -31,7 +31,7 @@ public class GuiMixin {
         method = "renderPlayerHealth",
         at = @At(value = "HEAD")
     )
-    private void beforeRenderStatusBars(GuiGraphics context, CallbackInfo ci) {
+    private void beforeRenderStatusBars(GuiGraphicsExtractor context, CallbackInfo ci) {
         float offset = PlayerLocatorPlusClient.INSTANCE.getCurrentHudOffset();
         if (offset > 0) {
             context.pose().pushMatrix();
@@ -43,7 +43,7 @@ public class GuiMixin {
         method = "renderPlayerHealth",
         at = @At(value = "RETURN")
     )
-    private void afterRenderStatusBars(GuiGraphics context, CallbackInfo ci) {
+    private void afterRenderStatusBars(GuiGraphicsExtractor context, CallbackInfo ci) {
         if (PlayerLocatorPlusClient.INSTANCE.getCurrentHudOffset() > 0) {
             context.pose().popMatrix();
         }
@@ -53,7 +53,7 @@ public class GuiMixin {
         method = "renderHotbarAndDecorations",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;hasExperience()Z")
     )
-    private void beforeRenderExperienceLevel(GuiGraphics context, DeltaTracker tickCounter, CallbackInfo ci) {
+    private void beforeRenderExperienceLevel(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
         PlayerLocatorPlusClient.INSTANCE.render(context, tickCounter);
 
         float offset = PlayerLocatorPlusClient.INSTANCE.getCurrentHudOffset();
@@ -65,9 +65,9 @@ public class GuiMixin {
 
     @Inject(
         method = "renderHotbarAndDecorations",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/DeltaTracker;)V")
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V")
     )
-    private void afterRenderExperienceLevel(GuiGraphics context, DeltaTracker tickCounter, CallbackInfo ci) {
+    private void afterRenderExperienceLevel(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
         if (PlayerLocatorPlusClient.INSTANCE.getCurrentHudOffset() > 0) {
             context.pose().popMatrix();
         }
@@ -77,7 +77,7 @@ public class GuiMixin {
         method = "renderChat",
         at = @At(value = "HEAD")
     )
-    private void beforeRenderChat(GuiGraphics context, DeltaTracker tickCounter, CallbackInfo ci) {
+    private void beforeRenderChat(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
         float offset = PlayerLocatorPlusClient.INSTANCE.getCurrentHudOffset();
         if (offset > 0) {
             context.pose().pushMatrix();
@@ -89,7 +89,7 @@ public class GuiMixin {
         method = "renderChat",
         at = @At(value = "RETURN")
     )
-    private void afterRenderChat(GuiGraphics context, DeltaTracker tickCounter, CallbackInfo ci) {
+    private void afterRenderChat(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
         if (PlayerLocatorPlusClient.INSTANCE.getCurrentHudOffset() > 0) {
             context.pose().popMatrix();
         }

@@ -6,8 +6,8 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderPipelines
-import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.components.PlayerFaceRenderer
+import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.components.PlayerFaceExtractor
 import net.minecraft.client.DeltaTracker
 import net.minecraft.client.renderer.entity.LivingEntityRenderer
 import net.minecraft.world.entity.LivingEntity
@@ -126,7 +126,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
         return true
     }
 
-    fun render(context: GuiGraphics, tickCounter: DeltaTracker) {
+    fun render(context: GuiGraphicsExtractor, tickCounter: DeltaTracker) {
         if (!config.visible) return
 
         if (!isBarVisible()) return
@@ -233,7 +233,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
                     /* color = */ color,
                 )
 
-                PlayerFaceRenderer.draw(
+                PlayerFaceExtractor.extractRenderState(
                     /* context = */ context,
                     /* texture = */ playerListEntry.skin.body.texturePath(),
                     /* x = */ markX + 1,
@@ -291,7 +291,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
     }
 
     private fun renderPlayerNamePlaques(
-        context: GuiGraphics,
+        context: GuiGraphicsExtractor,
         markers: List<NamePlaque>,
         barY: Int,
         fadeProgress: Float = 1f
@@ -344,7 +344,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
             )
 
             // for some reason, if the opacity is under 4, drawText just assumes the color does not include alpha
-            if (textAlpha > 3) context.drawString(
+            if (textAlpha > 3) context.text(
                 textRenderer,
                 marker.playerName,
                 plaqueX + NAME_PLAQUE_PADDING_X,
@@ -358,8 +358,14 @@ object PlayerLocatorPlusClient : ClientModInitializer {
     private fun getVanillaWaypoints(client: Minecraft): List<RelativePlayerLocation> {
         if (!config.showVanillaWaypoints) return emptyList()
 
+        // written by ai
+        // Capture and guard against a null camera entity
+        val cameraEntity = client.cameraEntity ?: return emptyList()
+        // written by ai
+        var someLevel = cameraEntity.level();
+
         val ret = mutableListOf<RelativePlayerLocation>()
-        client.connection?.waypointManager?.forEachWaypoint(client.cameraEntity) { waypoint ->
+        client.connection?.waypointManager?.forEachWaypoint(cameraEntity) { waypoint ->
             val uuid = Either.unwrap(waypoint.id().mapRight {
                 UUID.nameUUIDFromBytes("plp-waypoint:$it".toByteArray())
             })
@@ -367,7 +373,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
 
             val tickManager = client.level!!.tickRateManager()
             val relativeYaw = waypoint.yawAngleToCamera(
-                /* world = */ client.level,
+                /* world = */ someLevel,  // this was client.level
                 /* yawProvider = */ client.gameRenderer.mainCamera,
                 /* tickProgress = */ { ent ->
                     client.deltaTracker.getGameTimeDeltaPartialTick(!tickManager.isEntityFrozen(ent))
@@ -380,7 +386,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
                 Mth.cos(yaw * (Mth.PI / 180f))
             ).normalize()
 
-            var distance = waypoint.distanceSquared(client.cameraEntity)
+            var distance = waypoint.distanceSquared(cameraEntity)
             if (distance == Double.POSITIVE_INFINITY) {
                 // vanilla thinks the distance is +infinity when the waypoint is >322 blocks away
                 // 110224 = 332^2

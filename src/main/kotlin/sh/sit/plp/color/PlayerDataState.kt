@@ -7,6 +7,8 @@ import net.minecraft.world.level.saveddata.SavedDataType
 import sh.sit.plp.PlayerLocatorPlus
 import java.util.*
 import kotlin.jvm.optionals.getOrNull
+import net.minecraft.resources.Identifier
+import net.minecraft.util.datafix.DataFixTypes
 
 class PlayerDataState : SavedData() {
     companion object {
@@ -36,10 +38,10 @@ class PlayerDataState : SavedData() {
             .codec()
 
         private val TYPE = SavedDataType(
-            "${PlayerLocatorPlus.MOD_ID}-player_data",
+            Identifier.parse("${PlayerLocatorPlus.MOD_ID}-player_data"),
             ::PlayerDataState,
             CODEC,
-            null,
+            null as DataFixTypes,  // this was null
         )
 
         fun of(server: MinecraftServer): PlayerDataState {

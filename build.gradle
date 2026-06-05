@@ -6,8 +6,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
-	id "org.jetbrains.kotlin.jvm" version "2.2.20"
-	id "org.jetbrains.kotlin.plugin.serialization" version "2.2.20"
+	id "org.jetbrains.kotlin.jvm" version "2.3.21"
+	id "org.jetbrains.kotlin.plugin.serialization" version "2.3.21"
     id "com.gradleup.shadow" version "9.2.2"
 }
 
@@ -60,8 +60,8 @@ dependencies {
 	api("me.shedaniel.cloth:cloth-config-fabric:26.1.154") {
 		exclude(group: "net.fabricmc.fabric-api")
 	}
-	// Mod Menu
-	api("com.terraformersmc:modmenu:17.0.0-beta.2")
+	// Mod Menu  // yes you need to update every dependency and mod when you want to port your mod. crazy, right?
+	api("com.terraformersmc:modmenu:18.0.0-beta.1")
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.2.20")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.7.1")
@@ -112,10 +112,11 @@ tasks.withType(ShadowJar).configureEach {
         include(dependency("com.akuleshov7:ktoml-core-jvm"))
     }
 }
-jar {
-    input = shadowJar.archiveFile.get()
-}
-jar.dependsOn shadowJar
+// I'm gonna try and comment this out and hopefully it compiles without issues...
+//jar {
+//	input = shadowJar.archiveFile.get()
+//}
+//jar.dependsOn shadowJar
 
 java {
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task

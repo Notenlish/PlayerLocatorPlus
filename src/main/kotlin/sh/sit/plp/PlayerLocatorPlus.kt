@@ -27,8 +27,8 @@ object PlayerLocatorPlus : ModInitializer {
     override fun onInitialize() {
         ConfigManager.init()
 
-        PayloadTypeRegistry.playS2C().register(PlayerLocationsS2CPayload.ID, PlayerLocationsS2CPayload.CODEC)
-        PayloadTypeRegistry.playS2C().register(ModConfigS2CPayload.ID, ModConfigS2CPayload.CODEC)
+        PayloadTypeRegistry.clientboundPlay().register(PlayerLocationsS2CPayload.ID, PlayerLocationsS2CPayload.CODEC)
+        PayloadTypeRegistry.clientboundPlay().register(ModConfigS2CPayload.ID, ModConfigS2CPayload.CODEC)
 
         ServerPlayConnectionEvents.JOIN.register(ServerPlayConnectionEvents.Join { handler, _, _ ->
             BarUpdater.fullResend(handler.player)
