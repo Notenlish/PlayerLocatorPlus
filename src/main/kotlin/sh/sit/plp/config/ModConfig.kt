@@ -8,8 +8,8 @@ import me.shedaniel.autoconfig.ConfigData
 import me.shedaniel.autoconfig.annotation.Config
 import me.shedaniel.autoconfig.annotation.ConfigEntry
 import me.shedaniel.clothconfig2.gui.entries.SelectionListEntry.Translatable
-import net.minecraft.network.PacketByteBuf
-import net.minecraft.network.codec.PacketCodec
+import net.minecraft.network.FriendlyByteBuf
+import net.minecraft.network.codec.StreamCodec
 import sh.sit.plp.PlayerLocatorPlus
 
 @Config(name = PlayerLocatorPlus.MOD_ID)
@@ -116,18 +116,18 @@ class ModConfig : ConfigData {
     }
 
     companion object {
-        val PACKET_CODEC = object : PacketCodec<PacketByteBuf, ModConfig> {
+        val PACKET_CODEC = object : StreamCodec<FriendlyByteBuf, ModConfig> {
             val json = Json {
                 encodeDefaults = true
                 ignoreUnknownKeys = true
             }
 
-            override fun encode(buf: PacketByteBuf, value: ModConfig) {
-                buf.writeString(json.encodeToString(value), 16 * 1024)
+            override fun encode(buf: FriendlyByteBuf, value: ModConfig) {
+                buf.writeUtf(json.encodeToString(value), 16 * 1024)
             }
 
-            override fun decode(buf: PacketByteBuf): ModConfig {
-                val data = buf.readString(16 * 1024)
+            override fun decode(buf: FriendlyByteBuf): ModConfig {
+                val data = buf.readUtf(16 * 1024)
                 return json.decodeFromString(data)
             }
         }

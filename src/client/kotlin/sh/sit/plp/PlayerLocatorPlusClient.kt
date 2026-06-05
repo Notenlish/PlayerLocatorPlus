@@ -4,18 +4,18 @@ import com.mojang.datafixers.util.Either
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gl.RenderPipelines
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.client.gui.PlayerSkinDrawer
-import net.minecraft.client.render.RenderTickCounter
-import net.minecraft.client.render.entity.LivingEntityRenderer
-import net.minecraft.entity.LivingEntity
-import net.minecraft.util.Identifier
-import net.minecraft.util.math.MathHelper
-import net.minecraft.util.math.Vec3d
-import net.minecraft.util.profiler.Profilers
-import net.minecraft.world.GameMode
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.RenderPipelines
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.components.PlayerFaceRenderer
+import net.minecraft.client.DeltaTracker
+import net.minecraft.client.renderer.entity.LivingEntityRenderer
+import net.minecraft.world.entity.LivingEntity
+import net.minecraft.resources.Identifier
+import net.minecraft.util.Mth
+import net.minecraft.world.phys.Vec3
+import net.minecraft.util.profiling.Profiler
+import net.minecraft.world.level.GameType
 import org.joml.Vector2d
 import org.joml.Vector3f
 import sh.sit.plp.PlayerLocatorPlus.config
@@ -32,11 +32,11 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 object PlayerLocatorPlusClient : ClientModInitializer {
-    private val EXPERIENCE_BAR_BACKGROUND_TEXTURE = Identifier.of(PlayerLocatorPlus.MOD_ID, "hud/empty_bar")
-    private val PLAYER_MARK_TEXTURE = Identifier.of(PlayerLocatorPlus.MOD_ID, "hud/player_mark")
-    private val PLAYER_MARK_UP_TEXTURE = Identifier.of(PlayerLocatorPlus.MOD_ID, "hud/player_mark_up")
-    private val PLAYER_MARK_DOWN_TEXTURE = Identifier.of(PlayerLocatorPlus.MOD_ID, "hud/player_mark_down")
-    private val PLAYER_MARK_WHITE_OUTLINE_TEXTURE = Identifier.of(PlayerLocatorPlus.MOD_ID, "hud/player_mark_white_outline")
+    private val EXPERIENCE_BAR_BACKGROUND_TEXTURE = Identifier.fromNamespaceAndPath(PlayerLocatorPlus.MOD_ID, "hud/empty_bar")
+    private val PLAYER_MARK_TEXTURE = Identifier.fromNamespaceAndPath(PlayerLocatorPlus.MOD_ID, "hud/player_mark")
+    private val PLAYER_MARK_UP_TEXTURE = Identifier.fromNamespaceAndPath(PlayerLocatorPlus.MOD_ID, "hud/player_mark_up")
+    private val PLAYER_MARK_DOWN_TEXTURE = Identifier.fromNamespaceAndPath(PlayerLocatorPlus.MOD_ID, "hud/player_mark_down")
+    private val PLAYER_MARK_WHITE_OUTLINE_TEXTURE = Identifier.fromNamespaceAndPath(PlayerLocatorPlus.MOD_ID, "hud/player_mark_white_outline")
 
     private const val NAME_PLAQUE_PADDING_X = 4
     private const val NAME_PLAQUE_PADDING_Y = 2
@@ -50,7 +50,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
     val currentHudOffset get() = hudOffset.currentValue
 
     private val relativePositionsLock = ReentrantLock()
-    private var lastUpdatePosition = Vec3d.ZERO
+    private var lastUpdatePosition = Vec3.ZERO
     private val relativePositions = mutableMapOf<UUID, RelativePlayerLocation>()
 
     private data class NamePlaque(
@@ -78,7 +78,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
                 }
             }
 
-            lastUpdatePosition = MinecraftClient.getInstance().player?.entityPos ?: Vec3d.ZERO
+            lastUpdatePosition = Minecraft.getInstance().player?.position() ?: Vec3.ZERO
             relativePositionsLock.unlock()
         }
 
@@ -90,34 +90,34 @@ object PlayerLocatorPlusClient : ClientModInitializer {
     }
 
     fun isBarVisible(): Boolean {
-        val client = MinecraftClient.getInstance()
+        val client = Minecraft.getInstance()
 
         val player = client.player ?: return false
-        val interactionManager = client.interactionManager ?: return false
-        val inGameHud = client.inGameHud
-        val networkHandler = client.networkHandler
+        val interactionManager = client.gameMode ?: return false
+        val inGameHud = client.gui
+        val networkHandler = client.connection
 
         // hide when disabled
         if (!config.visible) {
             return false
         }
         // hide in F1
-        if (client.options.hudHidden) {
+        if (client.options.hideGui) {
             return false
         }
         // hide when there are no other players online and relativePositions is empty
         if (
             !config.visibleEmpty &&
             relativePositions.isEmpty() &&
-            networkHandler?.playerList?.any { it.profile.id != player.uuid } != true &&
+            networkHandler?.onlinePlayers?.any { it.profile.id != player.uuid } != true &&
             getVanillaWaypoints(client).isEmpty()
         ) {
             return false
         }
         // hide in spectator mode when the spectator menu is not open
         if (
-            interactionManager.currentGameMode == GameMode.SPECTATOR &&
-            !inGameHud.spectatorHud.isOpen &&
+            interactionManager.playerMode == GameType.SPECTATOR &&
+            !inGameHud.spectatorGui.isMenuActive &&
             !config.alwaysVisibleInSpectator
         ) {
             return false
@@ -126,59 +126,59 @@ object PlayerLocatorPlusClient : ClientModInitializer {
         return true
     }
 
-    fun render(context: DrawContext, tickCounter: RenderTickCounter) {
+    fun render(context: GuiGraphics, tickCounter: DeltaTracker) {
         if (!config.visible) return
 
         if (!isBarVisible()) return
 
-        val client = MinecraftClient.getInstance()
-        Profilers.get().push("plp")
+        val client = Minecraft.getInstance()
+        Profiler.get().push("plp")
         val player = client.player ?: return
-        val interactionManager = client.interactionManager ?: return
+        val interactionManager = client.gameMode ?: return
 
         val barWidth = 182
-        val x = context.scaledWindowWidth / 2 - 91
-        val y = context.scaledWindowHeight - 32 + 3
+        val x = context.guiWidth() / 2 - 91
+        val y = context.guiHeight() - 32 + 3
 
-        val barRendered = player.jumpingMount != null || interactionManager.hasExperienceBar()
+        val barRendered = player.jumpableVehicle() != null || interactionManager.hasExperience()
         if (!barRendered) {
-            context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_TEXTURE, x, y, barWidth, 5)
+            context.blitSprite(RenderPipelines.GUI_TEXTURED, EXPERIENCE_BAR_BACKGROUND_TEXTURE, x, y, barWidth, 5)
         }
 
         relativePositionsLock.lock()
 
         val namePlaques = mutableListOf<NamePlaque>()
 
-        val isTabPressed = client.options.playerListKey.isPressed
+        val isTabPressed = client.options.keyPlayerList.isDown
 
         for (position in (relativePositions.values.asSequence() + getVanillaWaypoints(client))) {
-            val playerMarker = player.entityWorld.getEntity(position.playerUuid)
+            val playerMarker = player.level().getEntity(position.playerUuid)
             val actualPosition = playerMarker
-                ?.getLerpedPos(tickCounter.getTickProgress(false))
+                ?.getPosition(tickCounter.getGameTimeDeltaPartialTick(false))
             val direction = if (actualPosition != null) {
-                actualPosition.subtract(player.getLerpedPos(tickCounter.getTickProgress(false)))
+                actualPosition.subtract(player.getPosition(tickCounter.getGameTimeDeltaPartialTick(false)))
             } else if (position.distance == 0f) {
-                Vec3d(position.direction)
+                Vec3(position.direction)
             } else {
                 val projectedPosition = lastUpdatePosition
-                    .add(Vec3d(position.direction).multiply(position.distance.toDouble()))
-                projectedPosition.subtract(player.getLerpedPos(tickCounter.getTickProgress(false)))
+                    .add(Vec3(position.direction).scale(position.distance.toDouble()))
+                projectedPosition.subtract(player.getPosition(tickCounter.getGameTimeDeltaPartialTick(false)))
             }
 
             val direction2d = Vector2d(direction.x, direction.z)
             if (!direction2d.isFinite) {
                 continue
             }
-            val rotationVec = player.getRotationVec(tickCounter.getTickProgress(false))
+            val rotationVec = player.getViewVector(tickCounter.getGameTimeDeltaPartialTick(false))
             var relativeAngle = -direction2d.angle(Vector2d(rotationVec.x, rotationVec.z)) * 180.0 / Math.PI
             if (relativeAngle.isNaN()) {
                 relativeAngle = 0.0
             }
 
             val horizontalFov = MathUtils.calculateHorizontalFov(
-                verticalFov = client.options.fov.value,
-                width = context.scaledWindowWidth,
-                height = context.scaledWindowHeight
+                verticalFov = client.options.fov().get(),
+                width = context.guiWidth(),
+                height = context.guiHeight()
             )
             val progress = (relativeAngle + horizontalFov / 2) / horizontalFov
             if (progress !in 0.0..1.0) {
@@ -189,7 +189,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
 
             val showHeadIcon = config.alwaysShowHeads || (config.showHeadsOnTab && isTabPressed)
 
-            val playerList = client.networkHandler?.playerList ?: emptyList()
+            val playerList = client.connection?.onlinePlayers ?: emptyList()
             val playerListEntry = playerList.find { it.profile.id == position.playerUuid }
 
             val opacity = if (config.fadeMarkers) {
@@ -213,7 +213,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
             }
 
             if (playerListEntry == null || !showHeadIcon) {
-                context.drawGuiTexture(
+                context.blitSprite(
                     /* pipeline = */ RenderPipelines.GUI_TEXTURED,
                     /* sprite = */ PLAYER_MARK_TEXTURE,
                     /* x = */ markX,
@@ -223,7 +223,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
                     /* color = */ color,
                 )
             } else {
-                context.drawGuiTexture(
+                context.blitSprite(
                     /* pipeline = */ RenderPipelines.GUI_TEXTURED,
                     /* sprite = */ PLAYER_MARK_WHITE_OUTLINE_TEXTURE,
                     /* x = */ markX,
@@ -233,15 +233,15 @@ object PlayerLocatorPlusClient : ClientModInitializer {
                     /* color = */ color,
                 )
 
-                PlayerSkinDrawer.draw(
+                PlayerFaceRenderer.draw(
                     /* context = */ context,
-                    /* texture = */ playerListEntry.skinTextures.body.texturePath(),
+                    /* texture = */ playerListEntry.skin.body.texturePath(),
                     /* x = */ markX + 1,
                     /* y = */ y,
                     /* size = */ 5,
-                    /* hatVisible = */ playerListEntry.shouldShowHat(),
+                    /* hatVisible = */ playerListEntry.showHat(),
                     /* upsideDown = */ (playerMarker as? LivingEntity)
-                        ?.let { LivingEntityRenderer.shouldFlipUpsideDown(it.name.string) }
+                        ?.let { LivingEntityRenderer.isUpsideDownName(it.name.string) }
                         ?: false,
                     /* color = */ -1
                 )
@@ -250,7 +250,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
             if (config.showHeight) {
                 val heightDiffNormalized = direction.normalize().y
                 if (heightDiffNormalized > 0.5) { // about 45 deg
-                    context.drawGuiTexture(
+                    context.blitSprite(
                         /* pipeline = */ RenderPipelines.GUI_TEXTURED,
                         /* sprite = */ PLAYER_MARK_UP_TEXTURE,
                         /* x = */ markX + 1,
@@ -259,7 +259,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
                         /* height = */ 4,
                     )
                 } else if (heightDiffNormalized < -0.5) {
-                    context.drawGuiTexture(
+                    context.blitSprite(
                         /* pipeline = */ RenderPipelines.GUI_TEXTURED,
                         /* sprite = */ PLAYER_MARK_DOWN_TEXTURE,
                         /* x = */ markX + 1,
@@ -276,27 +276,27 @@ object PlayerLocatorPlusClient : ClientModInitializer {
         } else {
             0f
         }
-        hudOffset.updateValues(client.renderTime / 1000000f)
+        hudOffset.updateValues(client.frameTimeNs / 1000000f)
 
         val fadeProgress = round(hudOffset.currentValue / HUD_OFFSET_TOTAL * 255f) / 255f
 
         if (namePlaques.isNotEmpty() && fadeProgress > 0) {
-            Profilers.get().push("plp-names")
+            Profiler.get().push("plp-names")
             renderPlayerNamePlaques(context, namePlaques, y, fadeProgress)
-            Profilers.get().pop()
+            Profiler.get().pop()
         }
 
         relativePositionsLock.unlock()
-        Profilers.get().pop()
+        Profiler.get().pop()
     }
 
     private fun renderPlayerNamePlaques(
-        context: DrawContext,
+        context: GuiGraphics,
         markers: List<NamePlaque>,
         barY: Int,
         fadeProgress: Float = 1f
     ) {
-        val textRenderer = MinecraftClient.getInstance().textRenderer
+        val textRenderer = Minecraft.getInstance().font
 
         // sort markers by their distance from the center (closest first)
         val sortedMarkers = markers.sortedBy {
@@ -307,7 +307,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
         val visibleMarkers = mutableListOf<Pair<NamePlaque, IntRange>>()
 
         for (marker in sortedMarkers) {
-            val textWidth = textRenderer.getWidth(marker.playerName)
+            val textWidth = textRenderer.width(marker.playerName)
             val plaqueWidth = textWidth + NAME_PLAQUE_PADDING_X * 2
 
             val plaqueX = marker.x - plaqueWidth / 2 + 4
@@ -325,9 +325,9 @@ object PlayerLocatorPlusClient : ClientModInitializer {
 
         // render markers in visibleMarkers
         for ((marker, _) in visibleMarkers) {
-            val textWidth = textRenderer.getWidth(marker.playerName)
+            val textWidth = textRenderer.width(marker.playerName)
             val plaqueWidth = textWidth + NAME_PLAQUE_PADDING_X * 2
-            val plaqueHeight = textRenderer.fontHeight + NAME_PLAQUE_PADDING_Y * 2
+            val plaqueHeight = textRenderer.lineHeight + NAME_PLAQUE_PADDING_Y * 2
 
             val plaqueX = marker.x - plaqueWidth / 2 + 4
             val plaqueY = barY - plaqueHeight - NAME_PLAQUE_MARGIN
@@ -344,7 +344,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
             )
 
             // for some reason, if the opacity is under 4, drawText just assumes the color does not include alpha
-            if (textAlpha > 3) context.drawText(
+            if (textAlpha > 3) context.drawString(
                 textRenderer,
                 marker.playerName,
                 plaqueX + NAME_PLAQUE_PADDING_X,
@@ -355,32 +355,32 @@ object PlayerLocatorPlusClient : ClientModInitializer {
         }
     }
 
-    private fun getVanillaWaypoints(client: MinecraftClient): List<RelativePlayerLocation> {
+    private fun getVanillaWaypoints(client: Minecraft): List<RelativePlayerLocation> {
         if (!config.showVanillaWaypoints) return emptyList()
 
         val ret = mutableListOf<RelativePlayerLocation>()
-        client.networkHandler?.waypointHandler?.forEachWaypoint(client.cameraEntity) { waypoint ->
-            val uuid = Either.unwrap(waypoint.source.mapRight {
+        client.connection?.waypointManager?.forEachWaypoint(client.cameraEntity) { waypoint ->
+            val uuid = Either.unwrap(waypoint.id().mapRight {
                 UUID.nameUUIDFromBytes("plp-waypoint:$it".toByteArray())
             })
             if (relativePositions.contains(uuid)) return@forEachWaypoint
 
-            val tickManager = client.world!!.tickManager
-            val relativeYaw = waypoint.getRelativeYaw(
-                /* world = */ client.world,
-                /* yawProvider = */ client.gameRenderer.camera,
+            val tickManager = client.level!!.tickRateManager()
+            val relativeYaw = waypoint.yawAngleToCamera(
+                /* world = */ client.level,
+                /* yawProvider = */ client.gameRenderer.mainCamera,
                 /* tickProgress = */ { ent ->
-                    client.renderTickCounter.getTickProgress(!tickManager.shouldSkipTick(ent))
+                    client.deltaTracker.getGameTimeDeltaPartialTick(!tickManager.isEntityFrozen(ent))
                 }
             )
-            val yaw = client.gameRenderer.camera.cameraYaw + relativeYaw
+            val yaw = client.gameRenderer.mainCamera.yaw() + relativeYaw
             val directionVector = Vector3f(
-                -MathHelper.sin(yaw * (MathHelper.PI / 180f)),
+                -Mth.sin(yaw * (Mth.PI / 180f)),
                 0f,
-                MathHelper.cos(yaw * (MathHelper.PI / 180f))
+                Mth.cos(yaw * (Mth.PI / 180f))
             ).normalize()
 
-            var distance = waypoint.squaredDistanceTo(client.cameraEntity)
+            var distance = waypoint.distanceSquared(client.cameraEntity)
             if (distance == Double.POSITIVE_INFINITY) {
                 // vanilla thinks the distance is +infinity when the waypoint is >322 blocks away
                 // 110224 = 332^2
@@ -391,7 +391,7 @@ object PlayerLocatorPlusClient : ClientModInitializer {
                 playerUuid = uuid,
                 direction = directionVector,
                 distance = sqrt(distance).toFloat(),
-                color = waypoint.config.color.orElse(config.constantColor),
+                color = waypoint.icon().color.orElse(config.constantColor),
             ))
         }
         return ret

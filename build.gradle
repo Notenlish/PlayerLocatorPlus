@@ -2,8 +2,9 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+// I don't know why this was net.fabricmc.fabric-loom-remap instead of net.fabricmc.fabric-loom but I changed it now
 plugins {
-	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
 	id "org.jetbrains.kotlin.jvm" version "2.2.20"
 	id "org.jetbrains.kotlin.plugin.serialization" version "2.2.20"
@@ -37,7 +38,7 @@ loom {
 configurations {
 	includeAndExpose
 
-	modApi {
+	api {
 		extendsFrom includeAndExpose
 	}
 	include {
@@ -47,18 +48,20 @@ configurations {
 
 dependencies {
 	minecraft "net.minecraft:minecraft:${project.minecraft_version}"
-	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	// mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+	// mappings loom.officialMojangMappings()
+	// mappings are removed because the porting guide told me to.
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 	// Fabric API
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
 	// Cloth Config API
-	modApi("me.shedaniel.cloth:cloth-config-fabric:21.11.153") {
+	api("me.shedaniel.cloth:cloth-config-fabric:26.1.154") {
 		exclude(group: "net.fabricmc.fabric-api")
 	}
 	// Mod Menu
-	modApi("com.terraformersmc:modmenu:17.0.0-beta.2")
+	api("com.terraformersmc:modmenu:17.0.0-beta.2")
 
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.2.20")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.7.1")
@@ -83,11 +86,11 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 21
+	it.options.release = 25
 }
 
 tasks.withType(KotlinCompile).configureEach {
-    compilerOptions.jvmTarget = JvmTarget.JVM_21
+    compilerOptions.jvmTarget = JvmTarget.JVM_25
 }
 tasks.withType(ShadowJar).configureEach {
     relocate("kotlin", "sh.sit.plp.kotlin_shaded")
@@ -109,10 +112,10 @@ tasks.withType(ShadowJar).configureEach {
         include(dependency("com.akuleshov7:ktoml-core-jvm"))
     }
 }
-remapJar {
+jar {
     input = shadowJar.archiveFile.get()
 }
-remapJar.dependsOn shadowJar
+jar.dependsOn shadowJar
 
 java {
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
@@ -120,8 +123,8 @@ java {
 	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
 }
 
 jar {

@@ -5,9 +5,9 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
-import net.minecraft.registry.RegistryKeys
-import net.minecraft.registry.tag.TagKey
-import net.minecraft.util.Identifier
+import net.minecraft.core.registries.Registries
+import net.minecraft.tags.TagKey
+import net.minecraft.resources.Identifier
 import org.slf4j.LoggerFactory
 import sh.sit.plp.color.PLPCommand
 import sh.sit.plp.config.ConfigManager
@@ -18,7 +18,7 @@ object PlayerLocatorPlus : ModInitializer {
     const val MOD_ID = "player-locator-plus"
     val logger = LoggerFactory.getLogger("player-locator-plus")!!
 
-    val HIDING_EQUIPMENT_TAG = TagKey.of(RegistryKeys.ITEM, Identifier.of("player-locator-plus", "hiding_equipment"))!!
+    val HIDING_EQUIPMENT_TAG = TagKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath("player-locator-plus", "hiding_equipment"))!!
 
     private var tickCounter = 0
 

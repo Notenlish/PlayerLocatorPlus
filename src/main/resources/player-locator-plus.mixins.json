@@ -5,9 +5,9 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "ArgumentCommandNodeMixin",
-    "ArgumentTypesMixin",
+    "ArgumentTypeInfosMixin",
     "CommandTreeS2CPacketArgumentNodeMixin",
-    "ServerCommonNetworkHandlerMixin"
+    "ServerCommonPacketListenerImplMixin"
   ],
   "client": [
   ],

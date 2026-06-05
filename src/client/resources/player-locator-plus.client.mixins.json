@@ -7,7 +7,7 @@
   ],
   "client": [
     "AutoconfigGuiRegistryAccessMixin",
-    "InGameHudMixin"
+    "GuiMixin"
   ],
   "injectors": {
     "defaultRequire": 1
