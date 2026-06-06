@@ -28,7 +28,7 @@ public class GuiMixin {
     private SpectatorGui spectatorGui;
 
     @Inject(
-        method = "renderPlayerHealth",
+        method = "extractPlayerHealth",  // Gui.render* methods are now Gui.extract*
         at = @At(value = "HEAD")
     )
     private void beforeRenderStatusBars(GuiGraphicsExtractor context, CallbackInfo ci) {
@@ -40,7 +40,7 @@ public class GuiMixin {
     }
 
     @Inject(
-        method = "renderPlayerHealth",
+        method = "extractPlayerHealth",
         at = @At(value = "RETURN")
     )
     private void afterRenderStatusBars(GuiGraphicsExtractor context, CallbackInfo ci) {
@@ -50,7 +50,7 @@ public class GuiMixin {
     }
 
     @Inject(
-        method = "renderHotbarAndDecorations",
+        method = "extractHotbarAndDecorations",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;hasExperience()Z")
     )
     private void beforeRenderExperienceLevel(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
@@ -64,8 +64,8 @@ public class GuiMixin {
     }
 
     @Inject(
-        method = "renderHotbarAndDecorations",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V")
+        method = "extractHotbarAndDecorations",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V")
     )
     private void afterRenderExperienceLevel(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
         if (PlayerLocatorPlusClient.INSTANCE.getCurrentHudOffset() > 0) {
@@ -74,7 +74,7 @@ public class GuiMixin {
     }
 
     @Inject(
-        method = "renderChat",
+        method = "extractChat",
         at = @At(value = "HEAD")
     )
     private void beforeRenderChat(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
@@ -86,7 +86,7 @@ public class GuiMixin {
     }
 
     @Inject(
-        method = "renderChat",
+        method = "extractChat",
         at = @At(value = "RETURN")
     )
     private void afterRenderChat(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
