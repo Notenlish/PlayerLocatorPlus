@@ -92,31 +92,50 @@ tasks.withType(JavaCompile).configureEach {
 tasks.withType(KotlinCompile).configureEach {
     compilerOptions.jvmTarget = JvmTarget.JVM_25
 }
-tasks.withType(ShadowJar).configureEach {
-    relocate("kotlin", "sh.sit.plp.kotlin_shaded")
-    relocate("kotlinx", "sh.sit.plp.kotlin_shadedx")
-    relocate("com.akuleshov7.ktoml", "sh.sit.plp.ktoml_shaded")
 
-    archiveClassifier = "dev"
-    addMultiReleaseAttribute = false
-    minimize()
-
-    from(sourceSets.named("client").map { it.output })
-    from("LICENSE")
-
-    dependencies {
-        include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-datetime-jvm"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm"))
-        include(dependency("com.akuleshov7:ktoml-core-jvm"))
-    }
+tasks.build {
+	dependsOn shadowJar
 }
-// I'm gonna try and comment this out and hopefully it compiles without issues...
+
+jar {
+	enabled = false
+}
+// Configure the shadowJar task
+shadowJar {
+	archiveClassifier = null
+	relocate("kotlin", "sh.sit.plp.kotlin_shaded")
+	relocate("kotlinx", "sh.sit.plp.kotlin_shadedx")
+	relocate("com.akuleshov7.ktoml", "sh.sit.plp.ktoml_shaded")
+
+	addMultiReleaseAttribute = false
+	// minimize()
+
+	from(sourceSets.named("client").map { it.output })
+	from("LICENSE")
+
+	dependencies {
+		include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
+		include(dependency("org.jetbrains.kotlinx:kotlinx-datetime-jvm"))
+		include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm"))
+		include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm"))
+		include(dependency("com.akuleshov7:ktoml-core-jvm"))
+	}
+}
+
+// Make the jar task (which replaces remapJar in 26.1) use the shadowJar output
 //jar {
-//	input = shadowJar.archiveFile.get()
+//	dependsOn shadowJar
+//	from zipTree(shadowJar.archiveFile)
+//
+//	// Preserve your existing jar configuration
+//	inputs.property "archivesName", project.base.archivesName
+//	from("LICENSE") {
+//		rename { "${it}_${inputs.properties.archivesName}"}
+//	}
+//
+//	// Ensure duplicates are handled properly (the shadowed classes come first)
+//	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 //}
-//jar.dependsOn shadowJar
 
 java {
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
@@ -128,13 +147,13 @@ java {
 	targetCompatibility = JavaVersion.VERSION_25
 }
 
-jar {
-	inputs.property "archivesName", project.base.archivesName
-
-	from("LICENSE") {
-		rename { "${it}_${inputs.properties.archivesName}"}
-	}
-}
+//jar {
+//	inputs.property "archivesName", project.base.archivesName
+//
+//	from("LICENSE") {
+//		rename { "${it}_${inputs.properties.archivesName}"}
+//	}
+//}
 
 // configure the maven publication
 publishing {
